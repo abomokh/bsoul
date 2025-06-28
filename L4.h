@@ -70,6 +70,7 @@ private:
     std::string packet_data;
     uint16_t src_port;
     uint16_t dst_port;
+    uint16_t index;
     std::string data;
 
     /**

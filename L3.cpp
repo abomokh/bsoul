@@ -103,18 +103,15 @@ bool l3_packet::validate_packet(open_port_vec open_ports,
                                uint8_t mac[MAC_SIZE]) {
     // Check TTL > 0
     if (ttl <= 0) {
-        std::cout << "    L3 validation failed: TTL <= 0 (TTL=" << static_cast<int>(ttl) << ")" << std::endl;
         return false;
     }
     
     // Temporarily disable checksum validation for testing
     // bool checksum_valid = validate_checksum();
     // if (!checksum_valid) {
-    //     std::cout << "    L3 validation failed: Invalid checksum" << std::endl;
     //     return false;
     // }
     
-    std::cout << "    L3 validation passed: TTL=" << static_cast<int>(ttl) << ", checksum=" << checksum << std::endl;
     return true;
 }
 
@@ -168,10 +165,29 @@ bool l3_packet::proccess_packet(open_port_vec &open_ports,
     ttl--;
     
     // Update checksum after TTL change
-    checksum = (checksum + 1) & 0xFFFF;
+    checksum = (checksum - 1) & 0xFFFF;
     
     // Check if packet is targeted to this NIC
     if (is_targeted_to_nic(ip)) {
+        // Change source IP to NIC's IP when packet is targeted to NIC
+        for (int i = 0; i < IP_V4_SIZE; i++) {
+            src_ip[i] = ip[i];
+        }
+        
+        // Recalculate checksum after IP change
+        uint16_t calculated_checksum = 0;
+        for (int i = 0; i < IP_V4_SIZE; i++) {
+            calculated_checksum += src_ip[i] + dst_ip[i];
+        }
+        calculated_checksum += ttl + dst_port + src_port;
+        
+        // Add L4 data to checksum calculation
+        for (char c : l4_data) {
+            calculated_checksum += static_cast<uint8_t>(c);
+        }
+        
+        checksum = calculated_checksum & 0xFFFF;
+        
         // Strip to L4 and handle
         // Create L4 packet with correct format: index|src_port|dest_port|data_bytes
         // Extract index from l4_data (first part before |)
@@ -191,6 +207,38 @@ bool l3_packet::proccess_packet(open_port_vec &open_ports,
         return l4_pkt.proccess_packet(open_ports, ip, mask, dst);
     }
     
+    // Check if source IP is in local network
+    bool src_in_local = true;
+    for (int i = 0; i < IP_V4_SIZE; i++) {
+        uint8_t mask_byte = (i < mask / 8) ? 0xFF : 
+                           (i == mask / 8) ? (0xFF << (8 - (mask % 8))) : 0x00;
+        if ((src_ip[i] & mask_byte) != (ip[i] & mask_byte)) {
+            src_in_local = false;
+            break;
+        }
+    }
+    
+    // If source is in local network and destination is external, change source IP to NIC's IP (NAT)
+    if (src_in_local && !is_local_network(ip, mask)) {
+        for (int i = 0; i < IP_V4_SIZE; i++) {
+            src_ip[i] = ip[i];
+        }
+        
+        // Recalculate checksum after IP change
+        uint16_t calculated_checksum = 0;
+        for (int i = 0; i < IP_V4_SIZE; i++) {
+            calculated_checksum += src_ip[i] + dst_ip[i];
+        }
+        calculated_checksum += ttl + dst_port + src_port;
+        
+        // Add L4 data to checksum calculation
+        for (char c : l4_data) {
+            calculated_checksum += static_cast<uint8_t>(c);
+        }
+        
+        checksum = calculated_checksum & 0xFFFF;
+    }
+    
     // Check if destination is in local network
     if (is_local_network(ip, mask)) {
         // Incoming packet to local network -> RQ
@@ -205,7 +253,7 @@ bool l3_packet::proccess_packet(open_port_vec &open_ports,
 
 bool l3_packet::as_string(std::string &packet) {
     packet.clear();
-    // Format: src_ip|dst_ip|ttl|checksum|dst_port|src_port|data
+    // Format: src_ip|dst_ip|ttl|checksum|src_port|dst_port|data
     for (int i = 0; i < IP_V4_SIZE; i++) {
         if (i > 0) packet += ".";
         packet += std::to_string(src_ip[i]);
@@ -215,6 +263,6 @@ bool l3_packet::as_string(std::string &packet) {
         if (i > 0) packet += ".";
         packet += std::to_string(dst_ip[i]);
     }
-    packet += "|" + std::to_string(ttl) + "|" + std::to_string(checksum) + "|" + std::to_string(dst_port) + "|" + std::to_string(src_port) + "|" + l4_data;
+    packet += "|" + std::to_string(ttl) + "|" + std::to_string(checksum) + "|" + std::to_string(src_port) + "|" + std::to_string(dst_port) + "|" + l4_data;
     return true;
 } 

@@ -221,41 +221,4 @@ generic_packet* nic_sim::packet_factory(std::string &packet) {
     }
     
     return nullptr;
-}
-
-bool nic_sim::process_packet(const std::string& packet_str) {
-    // Determine packet type and create appropriate packet object
-    generic_packet* packet = packet_factory(packet_str);
-    if (!packet) {
-        return false;
-    }
-    
-    // Validate packet
-    if (!packet->validate_packet(open_ports, nic_ip, mask, mac)) {
-        delete packet;
-        return false;
-    }
-    
-    // Process packet
-    memory_dest destination;
-    if (!packet->proccess_packet(open_ports, nic_ip, mask, destination)) {
-        delete packet;
-        return false;
-    }
-    
-    // Add to appropriate queue based on destination
-    switch (destination) {
-        case common::RQ:
-            RQ.push_back(packet_str);
-            break;
-        case common::TQ:
-            TQ.push_back(packet_str);
-            break;
-        case common::LOCAL_DRAM:
-            // Data already stored in open_port by L4 processing
-            break;
-    }
-    
-    delete packet;
-    return true;
 } 
