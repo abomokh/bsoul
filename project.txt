@@ -1,0 +1,325 @@
+Exercise Introduction
+In this exercise, we will build a simulator for a Network Interface Card (NIC), which receives data from the network, processes and updates it based on a defined set of rules and constraints. The simulator will be implemented using C++ only, and will focus on the principles of inheritance and polymorphism.
+
+This exercise emphasizes two things:
+
+Correctness – Are packets processed and forwarded as required?
+
+Proper resource management.
+
+basic definitions:
+
+MAC Address (Medium Access Control):
+A MAC address is a unique hardware identifier assigned to every NIC. It is intended for use in local networks and enables unambiguous identification of a device (computer or host) within the local network.
+
+A MAC address is 6 bytes (48 bits) long and is typically represented in hexadecimal format, such as:
+
+FC:4D:D4:12:34:56
+
+This is essentially 6 values between 00 and FF, separated by colons.
+
+In the computer's memory, the MAC address can be represented either as a 6-byte array or as an unsigned long value (for example). The MAC address can be defined in the following ways:
+
+unsigned long mac = (0xFC << 40) |
+                    (0x4D << 32) |
+                    (0xD4 << 24) |
+                    (0x12 << 16) |
+                    (0x34 << 8)  |
+                    (0x56);
+
+char mac[6] = {0xFC, 0x4D, 0xD4, 0x12, 0x34, 0x56};
+Each packet sent in the network contains two MAC addresses – the sender and the destination address.
+Therefore, if a packet arrives at a machine and the destination MAC address does not match it, the packet is dropped – that is, ignored and not processed.
+
+
+This is an unsigned integer (4 bytes) which indicates which computer sent the packet or where it is destined. When we write IP addresses, we do so in the following format: each byte is represented in decimal form (0–255), and each two bytes are separated by a dot. For example, the IP address:
+
+4.52.133.12
+is represented by the following number:
+
+unsigned int ip = (4 << 24) |
+                  (52 << 16) |
+                  (133 << 8) |
+                  (12);
+
+char ip[6] = {4, 52, 133, 12};
+
+Mask:
+A mask allows representing a group of IP addresses by indicating how many bits (starting from the most significant bits – MSB) are significant. The rest of the bits are considered "don’t care".
+This bit count is appended to the IP address using a slash (/) notation.
+For example, the following mask:
+255.63.1.1/15
+means that the first 15 bits of the IP address are considered significant, and the 17th bit and onward are don’t care.
+
+Clarification: You may be wondering what the difference is between a MAC address and an IP address.
+When data is transmitted over a network, it must pass through several intermediate stations. The IP address indicates the final destination of the packet – the place where the packet is ultimately meant to arrive.
+In contrast, the MAC address is local: at each hop, the MAC address refers to the next node the packet should be sent to. So the MAC address represents the next physical destination, and this changes at each stage.
+
+So in summary:
+IP addresses in the packet headers describe the end-to-end path,
+MAC addresses describe the next physical hop between the sender and the receiver on the local network.
+
+Port:
+A port (2 bytes) is a short number (type short) used to identify a specific application or service on a computer (i.e., a unique process number).
+It does not indicate the physical machine but rather which application is involved in communication.
+Only the destination port matters; the source port is used just to indicate which port sent the data.
+Port values range from 0 to 65535.
+
+
+
+Packet:
+A packet is a small unit of data transferred over a computer network. Instead of sending a whole file at once, the data is split into small packets – each packet is enriched with extra information to allow proper routing, error checking, and reassembly on the receiving side.
+Each packet is constructed in layers. In this exercise, packets are composed of four layers:
+
+Application Layer – L5
+• Size: 32 bytes
+• Content: The data itself – the content the application wants to send or receive.
+
+Transport Layer – L4
+The operating system constructs this layer. When an application wants to send data of any size, the OS splits it into chunks (in this exercise, 32 bytes) and adds the source port (ID of the sending app) and destination port (ID of the receiving app) to the content.
+
+• Size: 8 bytes
+• Content:
+○ 2 bytes – source port (who sent it)
+○ 2 bytes – destination port (who should receive it)
+○ 4 bytes – header representing the memory address where the data should be written.
+
+Network Layer – L3
+The network card constructs this layer. It receives an L4 packet from the OS and, based on the available information, prepares it for transmission over the network.
+
+• Size: 16 bytes
+• Content:
+○ 4 bytes – source IP address
+○ 4 bytes – destination IP address
+○ 4 bytes – TTL (Time to Live) – a counter that starts at a certain value. Each router the packet passes through decreases the value by 1. When TTL reaches 0, the packet is discarded (to avoid infinite loops).
+○ 4 bytes – Checksum – sum of bytes of layers L3, L4, and L5 (excluding this field) for error checking.
+
+MAC Layer – L2
+This layer is also constructed by the network card and is meant for local network communication. Once this layer is complete, the packet is ready for transmission.
+
+• Size: 16 bytes
+• Structure:
+○ 6 bytes – source MAC address (sender’s NIC)
+○ 6 bytes – destination MAC address (next NIC in the route)
+○ 4 bytes – Checksum – sum of all bytes in the packet (excluding this field) for general integrity checking.
+
+Part B – A Bit About the Network Card
+A network card has many roles. In this exercise, we will focus on just one – connecting a local network (e.g., Wi-Fi) to the external world. Every NIC has an IP address and subnet mask, which define its local network.
+The NIC checks whether the destination address matches its subnet. If yes, it processes the packet. Otherwise, the packet is stored in a queue called the Receive Queue (RQ). The NIC forwards the packet through the RQ to a hardware controller which will route the packet accordingly.
+For outgoing packets, the NIC checks whether a valid communication exists. If not, the packet is dropped. Otherwise, it is placed into the Transmit Queue (TQ).
+The NIC also handles applications directly (when packets are intended for the card itself). In that case, the content is stored in memory (L5).
+
+Note: This exercise does not implement queues or memory, but only simulates packet behavior.
+
+Part C – Our NIC
+The NIC simulator in this exercise will be a program that reads two input files:
+
+The first defines the NIC's parameters.
+
+The second contains packets of types L3, L4, and L5, which must be parsed and processed by the NIC.
+
+The NIC uses three memory areas:
+
+Receive Queue (RQ) – a queue that holds all packets destined for the local network.
+In the exercise, this will be modeled as a vector of string values.
+
+Transmit Queue (TQ) – a queue that holds all packets not destined for the local network.
+Also modeled as a vector of string.
+
+Local Memory – stores open connections, each described by:
+
+struct open_port {
+    short dest_port;
+    short source_port;
+    char data[64];
+};
+Note: The exercise does not require simulating how packets are received by the NIC, only where they are sent/stored.
+At the end of the exercise, print the contents of the three memory areas.
+NOTE!! In this exercise, it is forbidden to use the sstream library.
+
+
+**Implementing the Packet Processing Interface – Part D**
+As you have probably noticed, the network card is supposed to receive and process packets of different types, and make decisions regarding writing them to memory or discarding them. To avoid code duplication and allow for scalability,
+we want to implement the above process in a generic way. Therefore, we will implement the class **generic\_packet**
+which contains **3 pure virtual methods**:
+
+* **Validate\_packet**: Ensures the packet is valid. (to be described later)
+
+* **Process\_packet**: Updates the packet and returns the memory space where it should be written (the object itself).
+
+* **As\_string**: Returns a string describing the packet.
+
+The object and all full function signatures with documentation can be found in the file
+**/packets.hpp**
+
+Now we will implement three classes that inherit from **generic\_packet** and handle different types of packets:
+
+1. Packets of type L4 (l4_packet):
+
+L4 packet is for NIC itself.
+must check that communication existed between source port and dest port, if yes it must write the data starting from "address" index of the relevant array.
+if there is no open channel, no action needed (throw the packet).
+if the index is not valid, kill the packet (remove it).
+
+L4 packets are described as stings, while source port appears first, after that "|" for splitting, and then dest port, "|", dest index, "|", and then apeears all the data in hex format with spaces between each byte.
+
+for example:
+
+2500|2000|0|DD 00 00 00 00 ... 00
+
+2500 is source port
+200 dest port
+0 address
+the rest are the data while it has 0xDD as the first byte and the rest are zeros
+
+2. Packets of type L3 (l3_packet):
+We divide into five cases — in all cases, first perform a checksum and positive TTL check. An invalid packet will be discarded (no further actions needed):
+
+2.1 Incoming packet to the network – when the source address does not belong to the internal network, and the destination address does:
+
+The network card will decrement the TTL by 1.
+
+Update the checksum field.
+
+If TTL = 0 after decrementing, discard the packet.
+
+The new packet will be written as a string labeled RQ.
+
+2.2 Outgoing packet from the network – when the sender address belongs to the internal network, and the destination address does not:
+
+Perform all the checks described above.
+
+Replace the sender address with the network card’s address.
+
+Decrement the TTL by 1.
+
+If TTL = 0, discard the packet.
+
+Update the checksum field.
+
+Write the packet as a string labeled TQ.
+
+2.3 Passing-through packet – i.e., both the destination and source addresses do not belong to the internal network:
+
+The simulator performs the exact same actions as for an incoming packet (2.1),
+
+But finally writes the packet as TQ.
+
+2.4 Packet destined to the network card itself – the destination IP address is identical to the network card’s IP (ICN):
+
+The network card will check TTL and checksum; invalid packet will be discarded.
+
+The network card will remove the L3 layer and handle the remaining L4 packet as described previously.
+
+2.5 Packet where both source and destination belong to the internal network – discard it.
+
+Packets of type L3 will be represented as a string, containing:
+
+Sender IP address
+
+Destination IP address
+
+TTL value
+
+Checksum value
+
+Source port
+
+Destination port
+
+Address
+
+Finally, the data in hexadecimal format
+
+
+3. Packets of type L2 (l2_packet):
+
+You must check that the destination MAC address is the network card’s MAC; if not, discard the packet.
+
+Check the packet’s validity by verifying that the checksum value of this layer equals the sum of all bytes in the packet (excluding the checksum field itself).
+
+Remove the L2 layer and handle the remaining L3 layer as described previously.
+
+The MAC address is written in hexadecimal format, with bytes separated by ‘:’
+For example: A1:12:57:9F:00:01
+
+In this layer, the sender’s address is written first, followed by the destination address.
+At the end of the packet, the checksum field appears.
+
+Hint: Ask yourself what all packets have in common and how you can save effort and time through proper design.
+Note – in the generic class generic_packet there is an additional function with implementation and documentation;
+think about how this function can ease your implementation.
+
+The code should be written in the files:
+L2.cpp, L3.cpp, L4.cpp, L2.h, L3.h, L4.h
+
+---------------------------------------
+
+Creating a Factory – The First Step in Building the Simulator, Part E
+Now the hard part is behind us. Since the network card can receive many types of packets as input,
+we will implement a factory function for the card. What is a factory?
+
+The Factory Method is a very common design pattern, especially in the world of Object-Oriented Programming (OOP).
+The purpose of this method is to allow the creation of objects without exposing the internal logic of their creation.
+Instead of creating objects directly with new, we define a “factory”
+that knows how to create the desired object for us, depending on the need.
+
+The main advantages of this design pattern are separation of creation from usage, flexibility, and easy extensibility.
+
+In this exercise, the factory will receive a string that describes a packet of some type, and depending on the packet type,
+the factory will create the appropriate object and return a pointer to the generic class generic_packet.
+You can find the factory signature in the file nic_sim.hpp.
+
+It is recommended and even encouraged to add fields or functions, but it is forbidden to change or delete what already exists.
+
+-----------------------------------------------
+
+**Completing the Simulator Construction – Part F**
+The simulator will receive as arguments the names of **2 files**. The first is a simulator parameters file
+which will contain a **MAC** address, an **IP** address, and a mask describing the local address space,
+and a list of open connections (source port and destination port). The second argument is a file containing all the packets, separated by new lines.
+
+Implement the class **NIC\_SIM**, which contains **only 3 methods**:
+
+1. **Constructor** – receives as input the name of a file, reads from it the system parameters, and accordingly updates its parameters.
+   The parameters file will be in **TXT** format and follow this pattern:
+
+   ```
+   byte0:byte1:byte2:byte3:byte4:byte5  
+   num0.num1.num2.num3/num4  
+   src_prt:num0, dst_portb:num1  
+   src_prt:num0, dst_portb:num1  
+   ...
+   ```
+
+   The first line contains the network card’s **MAC** address in hexadecimal format,
+   the second line contains the **IP** address in decimal format and a mask together describing the local address space.
+   From the third line onward, each line describes an open communication of the network card via a pair of source and destination ports in decimal format.
+
+2. **Flow** – receives as parameter the name of a file containing packets of various types, iterates over all packets, updates them, and saves them in the appropriate memory locations.
+   The packets file will be a **TXT** file containing one packet string per line.
+
+3. **Print\_result** – prints all packets in **RQ**, then all packets in **TQ**, and finally all the information written to the open connections.
+
+Note – a full interface and documentation can be found in the file **nic\_sim.hpp**
+
+-----------------------------------------
+
+
+**Building the Makefile – Part G**
+You need to create a **Makefile** that will compile the code you implemented.
+The executable program should be named **nic\_sim.exe**.
+
+* Note: When working with Cpp, the convention is to use **CXX** instead of **CC**, and **CXXFLAGS** instead of **CFLAGS**.
+* If anything is unclear regarding the Makefile – now is the time to ask on the forum!
+
+------------------------------------
+
+**Submission – Part H**
+**Special notes:**
+
+1. You can assume that the files will be valid, and that the packet format will be correct.
+2. We will use your Makefile – it is your responsibility to ensure it works correctly!
+3. Make sure the program runs without memory leaks using valgrind. Points will be deducted for memory leaks.
+4. The code must follow the coding conventions as demonstrated in the exercises.
+5. NOTE!! In this exercise, it is forbidden to use the sstream library.
