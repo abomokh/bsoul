@@ -43,10 +43,15 @@ bool l4_packet::proccess_packet(open_port_vec &open_ports,
     // L4 processing: store data in the appropriate open_port starting from address
     for (auto& port : open_ports) {
         if (port.src_prt == src_port && port.dst_prt == dst_port) {
+            // Validate address bounds
+            if (address >= DATA_ARR_SIZE) {
+                return false; // Invalid address, discard packet
+            }
+            
             // Parse hex data and store starting from address
             size_t data_pos = 0;
             size_t start = 0;
-            while (data_pos < PACKET_DATA_SIZE && start < data.size()) {
+            while (data_pos < PACKET_DATA_SIZE && start < data.size() && (address + data_pos) < DATA_ARR_SIZE) {
                 // Skip spaces
                 while (start < data.size() && data[start] == ' ') start++;
                 if (start >= data.size()) break;
@@ -57,9 +62,7 @@ bool l4_packet::proccess_packet(open_port_vec &open_ports,
                 
                 // Parse hex byte
                 std::string byte_str = data.substr(start, end - start);
-                if (address + data_pos < DATA_ARR_SIZE) {
-                    port.data[address + data_pos] = std::stoi(byte_str, nullptr, 16);
-                }
+                port.data[address + data_pos] = std::stoi(byte_str, nullptr, 16);
                 data_pos++;
                 start = end + 1;
             }

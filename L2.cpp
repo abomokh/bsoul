@@ -86,11 +86,13 @@ bool l2_packet::validate_packet(open_port_vec open_ports,
             return false;
         }
     }
+    
     // Calculate checksum of the packet (excluding checksum field)
     uint32_t calculated_checksum = 0;
     for (int i = 0; i < MAC_SIZE; i++) calculated_checksum += src_mac[i];
     for (int i = 0; i < MAC_SIZE; i++) calculated_checksum += dst_mac[i];
     for (size_t i = 0; i < l3_packet_data.size(); ++i) calculated_checksum += static_cast<unsigned char>(l3_packet_data[i]);
+    
     return calculated_checksum == checksum;
 }
 
@@ -102,15 +104,7 @@ bool l2_packet::proccess_packet(open_port_vec &open_ports,
     if (!l3_packet_data.empty()) {
         l3_packet l3_pkt(l3_packet_data);
         if (l3_pkt.validate_packet(open_ports, ip, mask, nullptr)) {
-            bool result = l3_pkt.proccess_packet(open_ports, ip, mask, dst);
-            if (result) {
-                // Update the L3 packet data with the processed version
-                std::string updated_l3_data;
-                if (l3_pkt.as_string(updated_l3_data)) {
-                    l3_packet_data = updated_l3_data;
-                }
-            }
-            return result;
+            return l3_pkt.proccess_packet(open_ports, ip, mask, dst);
         }
     }
     return false;
