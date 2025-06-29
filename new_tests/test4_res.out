@@ -1,0 +1,5 @@
+# Test 4: MAC/IP Mismatch
+# Packet 1: MAC mismatch -> Dropped
+# Packet 2: Destination IP not in subnet -> Dropped
+RQ:
+TQ:

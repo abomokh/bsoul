@@ -40,9 +40,19 @@ bool l4_packet::proccess_packet(open_port_vec &open_ports,
                                uint8_t ip[IP_V4_SIZE],
                                uint8_t mask,
                                memory_dest &dst) {
-    // L4 processing: store data in the appropriate open_port starting from address
+    // First validate the packet (check if communication exists)
+    if (!validate_packet(open_ports, ip, mask, nullptr)) {
+        return false;
+    }
+    
+    // Find the matching open port and store data
     for (auto& port : open_ports) {
         if (port.src_prt == src_port && port.dst_prt == dst_port) {
+            // Check if address is valid (within bounds)
+            if (address >= DATA_ARR_SIZE) {
+                return false; // Invalid address
+            }
+            
             // Parse hex data and store starting from address
             size_t data_pos = 0;
             size_t start = 0;

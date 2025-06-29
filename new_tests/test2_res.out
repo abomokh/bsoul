@@ -1,0 +1,5 @@
+# Test 2: TTL Expiration
+# Packet 1: TTL = 0 -> Dropped
+# Packet 2: TTL = 1 -> Decremented to 0 -> Dropped
+RQ:
+TQ:

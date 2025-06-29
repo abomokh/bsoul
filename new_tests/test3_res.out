@@ -1,0 +1,5 @@
+# Test 3: Checksum Validation
+# Packet 1: Valid checksum -> Accepted
+# Packet 2: Invalid checksum -> Dropped
+RQ:
+TQ:

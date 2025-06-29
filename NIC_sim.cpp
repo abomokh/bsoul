@@ -138,19 +138,34 @@ void nic_sim::nic_flow(std::string packet_file) {
 }
 
 void nic_sim::nic_print_results() {
-    std::cout << "LOCAL DRAM:" << std::endl;
+    // Check if any port has non-zero data
+    bool has_data = false;
     for (const auto& port : open_ports) {
-        std::cout << port.src_prt << " " << port.dst_prt << ": ";
         for (int i = 0; i < DATA_ARR_SIZE; i++) {
-            // Create a non-const reference to work around the const issue
-            const_cast<common::open_port&>(port).print_hex_byte(i);
-            if (i < DATA_ARR_SIZE - 1) {
-                std::cout << " ";
+            if (port.data[i] != 0) {
+                has_data = true;
+                break;
             }
+        }
+        if (has_data) break;
+    }
+    
+    // Only print LOCAL DRAM if there's actual data
+    if (has_data) {
+        std::cout << "LOCAL DRAM:" << std::endl;
+        for (const auto& port : open_ports) {
+            std::cout << port.src_prt << " " << port.dst_prt << ": ";
+            for (int i = 0; i < DATA_ARR_SIZE; i++) {
+                // Create a non-const reference to work around the const issue
+                const_cast<common::open_port&>(port).print_hex_byte(i);
+                if (i < DATA_ARR_SIZE - 1) {
+                    std::cout << " ";
+                }
+            }
+            std::cout << std::endl;
         }
         std::cout << std::endl;
     }
-    std::cout << std::endl;
 
     std::cout << "RQ:" << std::endl;
     for (const auto& packet : RQ) {

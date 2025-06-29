@@ -13,6 +13,7 @@ private:
     uint8_t dst_ip[IP_V4_SIZE];
     uint32_t ttl;
     uint32_t checksum;
+    uint32_t original_checksum;
     uint16_t source_port;
     uint16_t dest_port;
     uint32_t address;

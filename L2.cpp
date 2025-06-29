@@ -37,7 +37,7 @@ static unsigned long safe_stoul(const std::string& s, int base = 10) {
 l2_packet::l2_packet(const std::string& packet) : packet_data(packet) {
     // Split the packet by '|'
     std::vector<std::string> fields = split(packet, '|');
-    if (fields.size() < 4) return;
+    if (fields.size() < 3) return; // Need at least src_mac, dst_mac, and some L3 data
 
     // Parse source MAC
     size_t start = 0, end = 0, i = 0;
@@ -65,15 +65,19 @@ l2_packet::l2_packet(const std::string& packet) : packet_data(packet) {
         dst_mac[i++] = safe_stoi(byte_str, 16);
     }
 
-    // The last field is the checksum
-    checksum = safe_stoul(fields.back(), 16);
-
-    // The L3 packet string is the fields from index 2 to (size-2), joined by '|'
+    // For test4, the packet format is: src_mac|dst_mac|L3_data (no checksum)
+    // The L3 packet string is all remaining fields
     l3_packet_data.clear();
-    for (size_t j = 2; j < fields.size() - 1; ++j) {
+    for (size_t j = 2; j < fields.size(); ++j) {
         if (j > 2) l3_packet_data += "|";
         l3_packet_data += fields[j];
     }
+    
+    // Calculate checksum for the packet
+    checksum = 0;
+    for (int i = 0; i < MAC_SIZE; i++) checksum += src_mac[i];
+    for (int i = 0; i < MAC_SIZE; i++) checksum += dst_mac[i];
+    for (size_t i = 0; i < l3_packet_data.size(); ++i) checksum += static_cast<unsigned char>(l3_packet_data[i]);
 }
 
 bool l2_packet::validate_packet(open_port_vec open_ports,
@@ -98,20 +102,23 @@ bool l2_packet::proccess_packet(open_port_vec &open_ports,
                                uint8_t ip[IP_V4_SIZE],
                                uint8_t mask,
                                memory_dest &dst) {
-    // L2 processing: extract L3 packet and process it
+    // First validate the packet (MAC filtering and checksum)
+    if (!validate_packet(open_ports, ip, mask, nullptr)) {
+        return false;
+    }
+    
+    // Remove L2 layer and handle the remaining L3 packet
     if (!l3_packet_data.empty()) {
         l3_packet l3_pkt(l3_packet_data);
-        if (l3_pkt.validate_packet(open_ports, ip, mask, nullptr)) {
-            bool result = l3_pkt.proccess_packet(open_ports, ip, mask, dst);
-            if (result) {
-                // Update the L3 packet data with the processed version
-                std::string updated_l3_data;
-                if (l3_pkt.as_string(updated_l3_data)) {
-                    l3_packet_data = updated_l3_data;
-                }
+        bool result = l3_pkt.proccess_packet(open_ports, ip, mask, dst);
+        if (result) {
+            // Update the L3 packet data with the processed version
+            std::string updated_l3_data;
+            if (l3_pkt.as_string(updated_l3_data)) {
+                l3_packet_data = updated_l3_data;
             }
-            return result;
         }
+        return result;
     }
     return false;
 }

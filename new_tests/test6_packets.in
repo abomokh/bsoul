@@ -1,0 +1,5 @@
+192.168.1.1|192.168.1.1|32|9999|4000|5000|0|00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff 00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff  # Case 3 (NIC IP)
+192.168.1.5|192.168.1.6|32|9999|4000|5000|0|00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff 00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff  # Case 4 (local to local)
+192.168.1.5|8.8.8.8|32|9999|4000|5000|0|00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff 00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff  # Case 5 (local to remote)
+8.8.8.8|192.168.1.10|32|9999|4000|5000|0|00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff 00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff  # Case 6 (remote to local)
+8.8.4.4|8.8.8.8|32|9999|4000|5000|0|00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff 00 11 22 33 44 55 66 77 88 99 aa bb cc dd ee ff  # Case 7 (remote to remote)
